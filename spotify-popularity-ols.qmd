@@ -1,0 +1,166 @@
+---
+title: "Spotify Track Popularity: Multiple OLS Regression (2020)"
+author: "Assem Mendygaziyeva"
+date: "15 October 2025"
+format:
+  html:
+    embed-resources: true
+editor: visual
+---
+
+## Introduction
+
+The year 2020 marked dramatic changes in music consumption, driven by the COVID‑19 pandemic and related lockdowns. With people spending more time at home and live music events disappearing, Spotify became a key platform for discovering, enjoying, and coping with music.
+
+This analysis focuses on tracks released in 2020 within the rock, EDM, hip‑hop, and acoustic genres, and examines how features such as danceability, energy, mode, and genre are associated with track popularity. The goal is to understand which musical characteristics were most strongly linked to popularity during this unique period.
+
+The central hypothesis is that tracks with higher danceability, greater energy, major mode, and specific genres (particularly hip‑hop) are associated with increased popularity.
+
+## Load Data / Packages
+
+```{r load data}
+spotify <- read.csv("spotify_data.csv", header = TRUE)
+```
+
+```{r}
+library(moments)
+library(ggplot2)
+library(PerformanceAnalytics)
+library(stargazer)
+library(pwr)
+```
+
+Subset to 4 genres AND year 2020
+
+```{r genre and year}
+
+sort(unique(spotify$genre))
+spotify_sub <- subset(spotify, genre %in% c("rock", "edm", "hip-hop", "acoustic") & year == 2020)
+```
+
+Checking for missing values
+
+```{r missing values}
+
+sum(is.na(spotify_sub$genre))
+sum(is.na(spotify_sub$popularity))
+sum(is.na(spotify_sub$energy))
+sum(is.na(spotify_sub$danceability))
+sum(is.na(spotify_sub$mode))
+```
+
+Outliers
+
+```{r}
+boxplot(spotify_sub$energy, main="Energy")
+boxplot(spotify_sub$popularity, main="Popularity")
+boxplot(spotify_sub$danceability, main="Energy")
+```
+
+## Univariate Analysis
+
+Categorical Summary
+
+```{r Categorical Summary}
+#genre
+table(spotify_sub$genre)
+table(spotify_sub$genre)/length(spotify_sub$genre)
+
+#mode
+table(spotify_sub$mode)
+table(spotify_sub$mode)/length(spotify_sub$mode)
+```
+
+Quantitative Summary
+
+```{r Quantitative Summary}
+#popularity
+summary(spotify_sub$popularity)
+sd(spotify_sub$popularity, na.rm = TRUE)
+sum(!is.na(spotify_sub$popularity))
+skewness(spotify_sub$popularity)
+
+#energy
+summary(spotify_sub$energy)
+sd(spotify_sub$energy, na.rm = TRUE)
+sum(!is.na(spotify_sub$energy))
+skewness(spotify_sub$energy)
+
+#dance
+summary(spotify_sub$danceability)
+sd(spotify_sub$danceability, na.rm = TRUE)
+sum(!is.na(spotify_sub$danceability))
+skewness(spotify_sub$danceability)
+
+```
+
+## Regression Analysis
+
+Genre Dummies
+
+```{r genre dummies}
+#rock reference
+spotify_sub$genre_edm      <- ifelse(spotify_sub$genre == "edm", 1, 0)
+spotify_sub$genre_hiphop   <- ifelse(spotify_sub$genre == "hip-hop", 1, 0)
+spotify_sub$genre_acoustic <- ifelse(spotify_sub$genre == "acoustic", 1, 0)
+```
+
+```{r dummie check}
+table(spotify_sub$genre, spotify_sub$genre_edm)
+table(spotify_sub$genre, spotify_sub$genre_hiphop)
+table(spotify_sub$genre, spotify_sub$genre_acoustic)
+```
+
+regression model
+
+```{r reg model}
+spotify_model <- lm(popularity ~ genre_edm + genre_hiphop + genre_acoustic + energy + danceability + mode, data = spotify_sub)
+summary(spotify_model)
+```
+
+Power test
+
+```{r}
+pwr.f2.test(u =4,
+v = 2397,
+f2 = 2.08 ,
+sig.level = 0.01,
+power = NULL
+)
+
+
+```
+
+stargazer
+
+```{r stargazer}
+stargazer(spotify_model, type = "text")
+```
+
+## Regression Plots
+
+```{r}
+chart.Correlation(spotify_sub[, c("popularity", "energy", "danceability")], histogram=TRUE, pch=19)
+```
+
+```{r diagnostic}
+plot(spotify_model)
+```
+
+```{r ggplot}
+ggplot(spotify_sub, aes(x = danceability, y = popularity, color = genre)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Figure 1: Popularity vs Danceability by Genre", x = "Danceability", y = "Popularity")
+
+```
+
+```{r}
+spotify_sub$mode <- as.factor(spotify_sub$mode)
+ggplot(spotify_sub, aes(x = energy, y = popularity, color = mode)) +
+  geom_point() +
+  geom_smooth(aes(group = mode, color = mode), method = "lm", se = FALSE) +
+  labs(title = "Figure 2: Popularity vs Energy by Mode", x = "Energy", y = "Popularity")
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
